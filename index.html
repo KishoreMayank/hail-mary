@@ -1,0 +1,1704 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Relativistic Mission Simulator — Project Hail Mary</title>
+<style>
+  :root {
+    --ink: #111;
+    --paper: #ffffff;
+    --rule: #333;
+    --muted: #6b6b6b;
+    --faint: #c9c4b8;
+    --accent: #a83232;
+    --gap:    #b58a3e;
+  }
+  html, body { background: var(--paper); color: var(--ink); margin: 0; }
+  body {
+    font-family: "et-book", Palatino, "Palatino Linotype", "Hoefler Text", Georgia, serif;
+    font-size: 16px;
+    line-height: 1.55;
+    padding: 2.5rem 2.5vw 3rem;
+    max-width: 1700px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-weight: 400;
+    font-style: italic;
+    font-size: 2rem;
+    line-height: 1.15;
+    letter-spacing: -0.005em;
+    margin: 0 0 0.45rem;
+  }
+  .subtitle {
+    color: var(--muted);
+    font-style: italic;
+    font-size: 0.92rem;
+    line-height: 1.45;
+    margin: 0 0 1.2rem;
+  }
+  figure { margin: 0 0 1.6rem; }
+  figcaption {
+    font-size: 0.92rem;
+    color: var(--muted);
+    margin-top: 1rem;
+    max-width: 72ch;
+    font-style: italic;
+  }
+  svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .rule          { stroke: var(--rule); stroke-width: 1; fill: none; }
+  .tick          { stroke: var(--rule); stroke-width: 1; }
+  .tick-minor    { stroke: var(--muted); stroke-width: 0.5; }
+  .tick-label    { font-size: 11px; fill: var(--ink); }
+  .tick-sub      { font-size: 10px; fill: var(--muted); }
+  .rule-label    { font-size: 13px; fill: var(--ink); font-style: italic; }
+  .event-rule    { stroke: var(--faint); stroke-width: 0.75; stroke-dasharray: 2 2; }
+  .event-label   { font-size: 11px; fill: var(--muted); font-style: italic; }
+  .total-label   { font-size: 12px; fill: var(--ink); }
+  .total-accent  { font-size: 12px; fill: var(--accent); }
+  .flip-mark     { fill: var(--accent); }
+  p.lede {
+    color: var(--muted);
+    font-style: italic;
+    font-size: 0.95rem;
+    line-height: 1.45;
+    margin: 0 0 1.4rem;
+  }
+  p.lede em, p.lede i { font-style: italic; }
+  .star          { fill: var(--ink); }
+  .star-sol      { fill: var(--ink); }
+  .star-dest     { fill: var(--accent); }
+  .star-name     { font-size: 21px; fill: var(--ink); font-style: italic; }
+  .star-dist     { font-size: 16px; fill: var(--muted); }
+  .star-name-acc { font-size: 21px; fill: var(--accent); font-style: italic; }
+  .ring          { stroke: var(--faint); stroke-width: 0.75; fill: none; }
+  .ring-label    { font-size: 16px; fill: var(--muted); font-style: italic; }
+  .trip-line     { stroke: var(--accent); stroke-width: 1.6; fill: none; }
+  .trip-line-faint { stroke: var(--accent); stroke-width: 1; fill: none; opacity: 0.25; }
+  .trip-label    { font-size: 14px; fill: var(--accent); }
+  .star-sub      { font-size: 16px; fill: var(--accent); font-style: italic; }
+  .star-hit      { fill: transparent; cursor: pointer; }
+  .star-hit:hover + .star-render,
+  .star-hit:hover { /* hover handled via JS class */ }
+  .star-render   { pointer-events: none; }
+  .bead          { fill: var(--accent); pointer-events: none; opacity: 0.7; }
+  .bead-legend   { font-size: 17px; fill: var(--muted); font-style: italic; }
+  /* spacetime diagram */
+  figure.wide-graphs {
+    margin-left: calc(50% - 50vw + 2.5vw);
+    margin-right: calc(50% - 50vw + 2.5vw);
+    width: auto;
+  }
+  .map-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.4rem;
+    align-items: start;
+  }
+  .spacetime-col { position: relative; }
+  .sim-details {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    z-index: 5;
+    margin: 0;
+  }
+  .sim-details > summary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    color: var(--ink);
+    font-size: 18px;
+    line-height: 1;
+    font-style: normal;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .sim-details > summary::-webkit-details-marker { display: none; }
+  .sim-details > summary::before { content: "+"; }
+  .sim-details > summary:hover { border-color: var(--ink); }
+  .sim-details[open] > summary {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+  .sim-details[open] > summary::before { content: "×"; }
+  .sim-details-popover {
+    position: absolute;
+    top: 34px;
+    right: 0;
+    width: min(340px, 80vw);
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+    padding: 0.9rem 1.05rem;
+  }
+  .sim-details-popover p {
+    margin: 0;
+    font-size: 0.92rem;
+    color: var(--ink);
+    line-height: 1.55;
+    font-style: italic;
+  }
+  .st-axis        { stroke: var(--rule); stroke-width: 1.2; fill: none; }
+  .st-tick        { stroke: var(--rule); stroke-width: 1; }
+  .st-tick-label  { font-size: 17px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+  .st-axis-title  { font-size: 18px; fill: var(--ink); font-style: italic; }
+  .st-worldline   { stroke: var(--ink); stroke-width: 2; fill: none; stroke-linejoin: round; stroke-linecap: round; }
+  .st-worldline-sol  { stroke: var(--muted); stroke-width: 1; fill: none; opacity: 0.55; }
+  .st-worldline-dest { stroke: var(--accent); stroke-width: 1; fill: none; opacity: 0.55; }
+  .st-lightcone   { stroke: var(--muted); stroke-width: 1; fill: none; stroke-dasharray: 4 4; }
+  .st-light-label { font-size: 13px; fill: var(--muted); font-style: italic; }
+  .st-flip-mark   { fill: var(--accent); }
+  .st-worldline-label { font-size: 18px; fill: var(--ink); font-style: italic; }
+  .st-dest-label  { font-size: 14px; fill: var(--accent); font-style: italic; }
+  .st-sol-label   { font-size: 14px; fill: var(--muted); font-style: italic; }
+  .ship-dot      { fill: var(--accent); pointer-events: none; }
+  .ship-glow     { fill: var(--accent); opacity: 0.18; pointer-events: none; }
+  .offmap-note   { font-size: 12px; fill: var(--muted); font-style: italic; }
+  .hint          { font-style: italic; text-transform: none; letter-spacing: 0; color: var(--muted); }
+
+  /* scenario title — single-line summary of the active configuration */
+  .scenario-eyebrow {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--muted);
+    font-style: italic;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin: 0.8rem 0 0.2rem;
+  }
+  .trip-meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem 1.6rem;
+    margin: 0.6rem 0 1.6rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--faint);
+  }
+  figure.wide-graphs { margin-top: 0.8rem; }
+  .scenario-title {
+    font-weight: 400;
+    font-size: 2.1rem;
+    line-height: 1.25;
+    margin: 0 0 0.4rem;
+    padding: 0;
+    color: var(--ink);
+    font-style: italic;
+    letter-spacing: -0.01em;
+  }
+  .scenario-title .dest   { color: var(--ink);    font-style: italic; }
+  .scenario-title .mode   { color: var(--muted);  font-style: italic; font-size: 1rem; margin-left: 0.35rem; }
+  .scenario-title .sep    { color: var(--faint);  font-style: normal; margin: 0 0.7rem; }
+  .scenario-title .dist   { color: var(--accent); font-style: normal; font-variant-numeric: tabular-nums; }
+  .scenario-title .accel  { color: var(--accent); font-style: normal; font-variant-numeric: tabular-nums; }
+  .scenario-title .flip   { color: var(--muted);  font-style: italic; font-size: 0.95rem; margin-left: 0.4rem; }
+  .scenario-title .peak-l { color: var(--muted);  font-style: italic; font-size: 1rem; }
+  .scenario-title .peak   { color: var(--accent); font-style: normal; font-variant-numeric: tabular-nums; }
+  /* Trip totals shown inline at the right of the scenario header. */
+  .scenario-stats {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.2rem 1rem;
+    margin: 0;
+    font-size: 0.72rem;
+  }
+  .scenario-stats .stat {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.35rem;
+  }
+  .scenario-stats .stat-label {
+    color: var(--muted);
+    font-style: italic;
+  }
+  .scenario-stats .stat-value {
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .scenario-stats .stat-value.stat-accent { color: var(--accent); }
+  .scenario-stats .stat + .stat::before {
+    content: "·";
+    color: var(--faint);
+    margin-right: 0.7rem;
+    margin-left: -0.7rem;
+  }
+
+  /* trip controls */
+  .trip-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem 1.8rem;
+    margin: 0 0 1.6rem;
+    padding: 0.6rem 0 0.7rem;
+    border-top: 1px solid var(--faint);
+    border-bottom: 1px solid var(--faint);
+  }
+  .preset-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.1rem 1.1rem;
+    align-items: baseline;
+  }
+  .preset-label {
+    font-size: 0.9rem;
+    color: var(--muted);
+    font-style: italic;
+    margin-right: 0.4rem;
+  }
+  .preset-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    font-size: 0.9rem;
+    color: var(--muted);
+    cursor: pointer;
+    font-style: italic;
+    line-height: 1.4;
+  }
+  .preset-btn:hover { color: var(--accent); }
+  .preset-btn.active { color: var(--accent); }
+  .accel-row {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    flex: 1 1 320px;
+    min-width: 280px;
+  }
+  .accel-label {
+    font-size: 0.9rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  .accel-readout {
+    font-size: 0.95rem;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    min-width: 3.4rem;
+  }
+  .accel-min, .accel-max {
+    font-size: 0.72rem;
+    color: var(--muted);
+    font-style: italic;
+    font-variant-numeric: tabular-nums;
+  }
+  input[type="range"].tufte-range {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    flex: 1 1 auto;
+    height: 18px;
+    margin: 0;
+    cursor: pointer;
+  }
+  input[type="range"].tufte-range:focus { outline: none; }
+  input[type="range"].tufte-range::-webkit-slider-runnable-track {
+    height: 1px;
+    background: var(--rule);
+    border: none;
+  }
+  input[type="range"].tufte-range::-moz-range-track {
+    height: 1px;
+    background: var(--rule);
+    border: none;
+  }
+  input[type="range"].tufte-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none;
+    margin-top: -4px;
+  }
+  input[type="range"].tufte-range::-moz-range-thumb {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none;
+  }
+  /* diagram titles inside SVGs */
+  .diagram-title    { font-size: 34px; fill: var(--ink); font-style: italic; }
+  .diagram-subtitle { font-size: 17px; fill: var(--muted); font-style: italic; }
+
+  /* light-clock section — heading + lede stay visible whether or not the
+     animation is expanded; only the interactive piece collapses. */
+  .lightclock-section {
+    margin: 2rem 0 0;
+    padding: 1rem 0 0;
+    border-top: 1px solid var(--faint);
+  }
+  .lightclock-heading {
+    font-size: 1.15rem;
+    font-weight: 400;
+    color: var(--ink);
+    margin: 0 0 0.5rem;
+    padding-bottom: 0.35rem;
+    display: inline-block;
+    border-bottom: 1px solid var(--rule);
+    letter-spacing: -0.005em;
+  }
+  .lightclock-heading .sec-num {
+    color: var(--muted);
+    margin-right: 0.4rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .lightclock-heading em { font-style: italic; }
+  .lightclock-lede {
+    color: var(--ink);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin: 0.4rem 0 1.6rem;
+  }
+  .lightclock { margin: 0; padding: 0; border: none; }
+  .lightclock > summary {
+    cursor: pointer;
+    font-style: italic;
+    color: var(--muted);
+    font-size: 0.92rem;
+    margin: 0 0 1.2rem;
+    list-style: none;
+    user-select: none;
+  }
+  .lightclock > summary::-webkit-details-marker { display: none; }
+  .lightclock > summary::before {
+    content: "+ ";
+    color: var(--muted);
+    font-style: normal;
+    margin-right: 0.2rem;
+  }
+  .lightclock[open] > summary::before { content: "− "; }
+  .lightclock[open] > summary .summary-closed { display: none; }
+  .lightclock:not([open]) > summary .summary-open { display: none; }
+  .clock-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.2rem;
+    align-items: start;
+    margin-bottom: 0.9rem;
+  }
+  .clock-cell { text-align: center; }
+  .clock-meta { margin-top: 0.4rem; }
+  .clock-label {
+    font-size: 0.95rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  .clock-ticks {
+    font-size: 1.25rem;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    margin-top: 0.1rem;
+  }
+  .clock-ticks .tick-unit {
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-style: italic;
+    margin-left: 0.3rem;
+  }
+  .clock-control {
+    max-width: 600px;
+    margin: 0 auto 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .clock-control-label {
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-style: italic;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .clock-v-readout {
+    font-size: 0.95rem;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    min-width: 3.6rem;
+    text-align: right;
+  }
+  .lightclock-intro {
+    color: var(--ink);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin: 0.4rem 0 1.4rem;
+  }
+  .lightclock-explain {
+    color: var(--ink);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin: 1rem 0 1.4rem;
+  }
+  .lightclock-explain .accent { color: var(--accent); font-variant-numeric: tabular-nums; font-style: normal; }
+  /* SVG bits */
+  .mirror      { stroke: var(--ink); stroke-width: 3; stroke-linecap: round; }
+  .clock-frame { stroke: var(--faint); stroke-width: 1; stroke-dasharray: 3 3; fill: none; }
+  .photon      { fill: var(--accent); }
+  .photon-trail{ stroke: var(--accent); stroke-width: 1; fill: none; opacity: 0.35; stroke-linejoin: round; }
+  .clock-cap   { font-size: 12px; fill: var(--muted); font-style: italic; }
+
+  /* simultaneity readout (between map-pair and trip-readout) */
+  .sim-line-earth { stroke: var(--ink);    stroke-width: 1.1; fill: none; stroke-dasharray: 5 4; opacity: 0.55; }
+  .sim-line-ship  { stroke: var(--accent); stroke-width: 1.1; fill: none; stroke-dasharray: 5 4; opacity: 0.85; }
+  .sim-inter-earth { fill: var(--ink); }
+  .sim-inter-ship  { fill: var(--paper); stroke: var(--accent); stroke-width: 1.8; }
+  .sim-inter-earth-label { font-size: 17px; fill: var(--ink);    font-style: italic; }
+  .sim-inter-ship-label  { font-size: 16px; fill: var(--accent); font-style: italic; }
+  .gap-bracket { stroke: var(--gap); stroke-width: 1.4; fill: none; }
+  .gap-cap     { stroke: var(--gap); stroke-width: 1.4; }
+  .gap-label   { font-size: 16px; fill: var(--gap); font-style: italic; }
+  .current-pos { fill: var(--paper); stroke: var(--accent); stroke-width: 2; }
+  .lightcone-inline-label { font-size: 16px; fill: var(--muted); font-style: italic; }
+  .departure-label { font-size: 16px; fill: var(--ink); font-style: italic; }
+  .sim-readout {
+    margin: 1rem auto 0;
+    max-width: 68ch;
+    text-align: center;
+  }
+  /* Two-column split — gap explanation on the left, live bars on the right */
+  .readout-split {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.4fr);
+    gap: 2.4rem;
+    align-items: stretch;
+    margin: 1.4rem 0 1.2rem;
+  }
+  .readout-split > * {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+  .readout-split .sim-explain { font-size: 0.95rem; margin-top: 0.4rem; }
+  /* Compact controls sitting in the header next to the scenario title. */
+  .trip-controls-inline {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1.4rem;
+    margin: 0;
+    padding: 0;
+    border: none;
+    font-size: 0.85rem;
+  }
+  .trip-controls-inline .preset-row,
+  .trip-controls-inline .accel-row { display: flex; align-items: center; gap: 0.55rem; }
+  /* Segmented mode switcher */
+  .mode-switcher {
+    display: inline-flex;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--paper);
+  }
+  .mode-switcher .mode-btn {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0.25rem 0.7rem;
+    font: inherit;
+    font-size: 0.82rem;
+    font-style: normal;
+    color: var(--muted);
+    cursor: pointer;
+    line-height: 1.3;
+    transition: background 0.12s, color 0.12s;
+  }
+  .mode-switcher .mode-btn + .mode-btn { border-left: 1px solid var(--rule); }
+  .mode-switcher .mode-btn:hover:not(.active) { color: var(--ink); }
+  .mode-switcher .mode-btn.active {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .trip-controls-inline .preset-row { gap: 0.1rem 0.6rem; align-items: baseline; }
+  .trip-controls-inline .accel-row  { gap: 0.55rem; min-width: 0; flex: 0 0 auto; }
+  .trip-controls-inline .preset-label,
+  .trip-controls-inline .accel-label { font-size: 0.85rem; }
+  .trip-controls-inline .preset-btn  { font-size: 0.85rem; }
+  .trip-controls-inline .accel-readout { font-size: 0.85rem; min-width: 2.6rem; }
+  .trip-controls-inline input[type="range"].tufte-range {
+    flex: 0 0 140px;
+    width: 140px;
+  }
+  .readout-split .live-bars { margin: 0; max-width: none; }
+  .readout-split .live-summary { margin-top: 0.9rem; max-width: none; }
+  /* Totals as a single-column key-value list so it shares a rhythm with
+     the live bars on the right. Label left, value right, baseline aligned. */
+  .trip-stats.trip-stats-2x2 {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    max-width: none;
+    margin: 0;
+    text-align: left;
+  }
+  .trip-stats.trip-stats-2x2 .stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    text-align: left;
+    gap: 1rem;
+  }
+  .trip-stats.trip-stats-2x2 .stat-label {
+    font-size: 0.9rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  .trip-stats.trip-stats-2x2 .stat-value {
+    font-size: 1.05rem;
+    font-variant-numeric: tabular-nums;
+    margin-top: 0;
+  }
+  @media (max-width: 820px) {
+    .readout-split { grid-template-columns: 1fr; gap: 1.4rem; }
+  }
+  .sim-sentence {
+    font-size: 0.95rem;
+    margin: 0 0 0.9rem;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .sim-earth { color: var(--ink); }
+  .sim-ship  { color: var(--accent); }
+  .sim-gap   { color: var(--ink); font-weight: 600; }
+  .sim-explain {
+    font-size: 0.92rem;
+    color: var(--muted);
+    font-style: italic;
+    margin: 0;
+    line-height: 1.55;
+    text-align: left;
+  }
+
+  /* trip readout — route heading + horizontal stat strip + γ chart */
+  .trip-readout {
+    margin: 1.4rem 0 0;
+  }
+  .trip-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.4rem 2rem;
+    max-width: 900px;
+    margin: 0 auto 1.2rem;
+  }
+  .trip-stats-top {
+    margin: 0 auto 1.4rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--faint);
+  }
+  .stat          { text-align: center; }
+  .stat-label    { font-size: 0.82rem; color: var(--muted); font-style: italic; }
+  .stat-value    { font-size: 1.15rem; color: var(--ink); font-variant-numeric: tabular-nums; margin-top: 0.15rem; }
+  .stat-accent   { color: var(--accent); }
+  /* profile chart styles */
+
+  /* live progress bars — current ship state */
+  .live-bars {
+    display: grid;
+    gap: 0.35rem 0;
+    max-width: 900px;
+    margin: 0 auto 1rem;
+  }
+  .bar-row {
+    display: grid;
+    grid-template-columns: 5.5rem 1fr 5rem;
+    align-items: center;
+    gap: 1rem;
+  }
+  .bar-label {
+    font-style: italic;
+    color: var(--muted);
+    font-size: 0.88rem;
+    line-height: 1.2;
+  }
+  .bar-track {
+    height: 7px;
+    background: #ece8dd;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  .bar-fill {
+    height: 100%;
+    width: 0;
+    border-radius: 4px;
+    transition: width 0.08s linear;
+  }
+  .bar-grace { background: #c1393a; }
+  .bar-earth { background: #e0747a; }
+  .bar-speed { background: #355e7c; }
+  .bar-gamma { background: #d49a2a; }
+  .bar-value {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.88rem;
+    color: var(--ink);
+    font-style: italic;
+    line-height: 1.2;
+  }
+  .bar-value.accent { color: var(--accent); font-style: normal; }
+  .live-summary {
+    max-width: 900px;
+    margin: 0.7rem auto 0;
+    font-size: 0.92rem;
+    color: var(--ink);
+    font-style: italic;
+    text-align: left;
+  }
+  .live-summary .accent { color: var(--accent); font-style: normal; font-variant-numeric: tabular-nums; }
+  .live-regime {
+    margin: 0.6rem 0 0;
+    font-size: 0.95rem;
+    color: var(--ink);
+    font-style: italic;
+    text-align: left;
+  }
+  /* Centered narrative band directly below the diagrams */
+  .live-narrative {
+    text-align: center;
+    max-width: 900px;
+    margin: 1.4rem auto 0.4rem;
+  }
+  .live-narrative .live-summary,
+  .live-narrative .live-regime {
+    text-align: center;
+    margin: 0.4rem auto;
+    max-width: none;
+  }
+  .live-narrative .live-summary { font-size: 1rem; }
+  .live-narrative .live-regime  { font-size: 0.95rem; }
+  .live-regime .accent { color: var(--accent); font-style: normal; font-variant-numeric: tabular-nums; }
+  .live-regime strong  { color: var(--ink); font-weight: 600; font-style: normal; }
+  .live-regime.is-arrival {
+    /* Quick fade-in flash when the trip lands. */
+    animation: arrivalFlash 0.6s ease-out;
+  }
+  @keyframes arrivalFlash {
+    0%   { opacity: 0;   transform: translateY(2px); }
+    100% { opacity: 1;   transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+
+<h1>Relativistic Mission Simulator</h1>
+<p class="subtitle">A visual companion to <i>Project Hail Mary</i>.</p>
+
+<p class="lede">
+  Earth and a near&#8209;light&#8209;speed ship can't agree on what
+  &lsquo;now&rsquo; means. The map (left) shows <i>where</i> the ship is in
+  space; the spacetime diagram (right) shows <i>when</i> &mdash; and the two
+  dashed sweep&#8209;lines, each observer's own &lsquo;right now,&rsquo;
+  tilt apart as the ship approaches&nbsp;c.
+</p>
+
+<span class="scenario-eyebrow">Scenario</span>
+<h2 class="scenario-title" id="scenario-title" aria-live="polite">
+  <span class="dest" id="sc-dest">Tau Ceti</span><span class="mode" id="sc-mode"></span>
+  <span class="sep">&middot;</span>
+  <span class="dist" id="sc-dist">11.91 ly</span>
+</h2>
+<div class="trip-meta-row">
+  <div class="trip-controls trip-controls-inline">
+    <div class="preset-row">
+      <div class="mode-switcher">
+        <button class="mode-btn active" data-mode="oneway">one&#8209;way</button>
+        <button class="mode-btn" data-mode="roundtrip">round&#8209;trip</button>
+      </div>
+    </div>
+    <div class="accel-row">
+      <span class="accel-min">0.1 g</span>
+      <input id="accel-slider" class="tufte-range" type="range" min="0.1" max="5.0" step="0.1" value="1.5" aria-label="Proper acceleration in g">
+      <span class="accel-max">5 g</span>
+      <span class="accel-readout" id="accel-readout">1.5 g</span>
+    </div>
+  </div>
+  <div class="scenario-stats">
+    <div class="stat"><span class="stat-label">Earth time</span><span class="stat-value" id="stat-earth">&mdash;</span></div>
+    <div class="stat"><span class="stat-label">Ship time</span><span class="stat-value stat-accent" id="stat-ship">&mdash;</span></div>
+    <div class="stat"><span class="stat-label">peak &gamma;</span><span class="stat-value" id="stat-gamma">&mdash;</span></div>
+    <div class="stat"><span class="stat-label">peak v</span><span class="stat-value" id="stat-vel">&mdash;</span></div>
+  </div>
+</div>
+
+<figure class="wide-graphs">
+  <div class="map-pair">
+    <svg id="starmap"   viewBox="0 0 760 760" role="img" aria-label="Nearby star map"></svg>
+    <div class="spacetime-col">
+      <svg id="spacetime" viewBox="0 0 760 760" role="img" aria-label="Spacetime diagram of the trip"></svg>
+      <details class="sim-details">
+        <summary aria-label="What is this gap?"></summary>
+        <div class="sim-details-popover">
+          <p>
+            The gap isn't a signal delay &mdash; no light is still in flight. It
+            isn't the clock&#8209;slowing effect either (that's time dilation,
+            the <i>peak&nbsp;&gamma;</i> value above). It's a third thing: when
+            two observers move past each other at high speed, they actually
+            disagree about which event &lsquo;out there&rsquo; counts as
+            &lsquo;right now.&rsquo; Watch the gap collapse to zero the moment
+            the ship brakes to rest at its destination.
+          </p>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <div class="live-narrative">
+    <p class="live-summary" id="live-summary">
+      &gamma; = <span class="accent" id="live-gamma">1.00</span> &mdash; each second of Grace's life equals <span class="accent" id="live-gamma2">1.00</span> seconds on Earth's clock.
+    </p>
+    <p class="live-regime" id="live-regime">
+      <em id="regime-label">Subrelativistic</em> &mdash; Earth ages <span class="accent" id="regime-ratio">1.0&times;</span> faster than the ship.
+      <span id="regime-blurb">Almost no time dilation yet.</span>
+    </p>
+  </div>
+
+  <div class="trip-readout">
+      <div>
+        <div class="live-bars">
+          <div class="bar-row">
+            <span class="bar-label">Grace</span>
+            <div class="bar-track"><div class="bar-fill bar-grace" id="bar-fill-grace"></div></div>
+            <span class="bar-value" id="bar-val-grace">&mdash;</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">Earth</span>
+            <div class="bar-track"><div class="bar-fill bar-earth" id="bar-fill-earth"></div></div>
+            <span class="bar-value" id="bar-val-earth">&mdash;</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">speed</span>
+            <div class="bar-track"><div class="bar-fill bar-speed" id="bar-fill-speed"></div></div>
+            <span class="bar-value accent" id="bar-val-speed">&mdash;</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">&gamma; (dilation)</span>
+            <div class="bar-track"><div class="bar-fill bar-gamma" id="bar-fill-gamma"></div></div>
+            <span class="bar-value" id="bar-val-gamma">&mdash;</span>
+          </div>
+        </div>
+      </div>
+  </div>
+
+</figure>
+
+<section class="lightclock-section">
+  <h2 class="lightclock-heading">But <em>why</em> does sideways motion steal time?</h2>
+
+  <details class="lightclock" open>
+    <summary><span class="summary-closed">Show the light&#8209;clock animation</span><span class="summary-open">Hide animation</span></summary>
+
+    <p class="lightclock-intro">
+      The formula is exact, but it doesn't explain itself. Picture a clock
+      made of two mirrors with a pulse of light bouncing between them; each
+      bounce is one tick. At rest, the pulse travels straight up and down.
+      Once the clock is moving, an outside observer sees the pulse trace a
+      diagonal &mdash; a longer path. Light's speed is the same in every
+      frame, so a longer path means more time per tick. The moving clock
+      runs slow, and so does every clock riding with it &mdash; including
+      the biology of the crew.
+    </p>
+
+    <div class="clock-pair">
+      <div class="clock-cell">
+        <svg id="clock-still" viewBox="0 0 380 240" role="img" aria-label="Stationary light clock"></svg>
+        <div class="clock-meta">
+          <div class="clock-label">stationary clock</div>
+          <div class="clock-ticks"><span id="ticks-still">0</span><span class="tick-unit">ticks</span></div>
+        </div>
+      </div>
+      <div class="clock-cell">
+        <svg id="clock-moving" viewBox="0 0 380 240" role="img" aria-label="Moving light clock"></svg>
+        <div class="clock-meta">
+          <div class="clock-label">moving clock (<span id="clock-label-v">0.60</span> &times; speed of light)</div>
+          <div class="clock-ticks"><span id="ticks-moving">0</span><span class="tick-unit">ticks</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="clock-control">
+      <span class="clock-control-label">moving clock&rsquo;s speed</span>
+      <input id="clock-v" class="tufte-range" type="range" min="0" max="0.95" step="0.01" value="0.6" aria-label="Moving clock speed as fraction of c">
+      <span class="clock-v-readout" id="clock-v-readout">0.60 c</span>
+    </div>
+
+    <p class="lightclock-explain">
+      After five seconds, the stationary clock has ticked
+      <span class="accent" id="clock-explain-still">five</span> times; the moving one,
+      <span class="accent" id="clock-explain-moving">four</span>. That missing tick
+      is the same deficit that puts the ship's clock behind Earth's on every
+      trip in the simulator above.
+    </p>
+  </details>
+
+  <p class="lightclock-lede">
+    Every number above is exact for a relativistic rocket holding constant
+    proper acceleration, flipping at the midpoint. A real ship would still
+    have to solve fuel, radiation, and navigation at near&#8209;c &mdash;
+    problems the simulator skips &mdash; but the time&#8209;dilation
+    arithmetic is what would actually unfold. The fiction (<i>Project Hail
+    Mary</i>, <i>Interstellar</i>, <i>The Forever War</i>) gets this part
+    right.
+  </p>
+</section>
+
+<script>
+  // --- physics ---
+  const C  = 299792458;
+  const G0 = 9.80665;
+  const LY = 9.4607304725808e15;
+  const YR = 365.25 * 86400;
+
+  // Mutable proper acceleration in units of g, controlled by the slider.
+  let accel_g = 1.5;
+  const aSI = () => accel_g * G0;
+
+  // Trip mode: 'oneway' = 2 legs (accel + decel), 'roundtrip' = 4 legs (out & back).
+  let tripMode = "oneway";
+  const nLegs = () => tripMode === "roundtrip" ? 4 : 2;
+
+  // --- star map ---
+  // Galactic coordinates (l, b in degrees) and distance (ly) for nearby stars.
+  // Projection: top-down onto the galactic plane.
+  //   X = d cos(b) cos(l)   (toward galactic centre at l=0)
+  //   Y = d cos(b) sin(l)   (direction of galactic rotation at l=90)
+  // Per-star label offsets are hand-placed to avoid collisions.
+  const STARS = [
+    { name: "Sol",             l:   0.00, b:   0.00, d:  0.00,                      sol:  true, anchor: "start", dx:  10, dy:  20, displayName: "Sol" },
+    { name: "Alpha Centauri",  l: 315.73, b:  -0.68, d:  4.37,                                  anchor: "start", dx:  12, dy:  -6, displayName: "α Centauri" },
+    { name: "Sirius",          l: 227.20, b:  -8.90, d:  8.60,                                  anchor: "end",   dx: -12, dy:  -8, displayName: "Sirius" },
+    { name: "Epsilon Eridani", l: 195.80, b: -48.00, d: 10.48,                                  anchor: "end",   dx: -12, dy:  -8, displayName: "ε Eridani" },
+    { name: "Tau Ceti",        l: 173.10, b: -73.40, d: 11.91, color: "#d97a2e", dest: true,    anchor: "start", dx:  16, dy:  -8, displayName: "Tau Ceti" },
+    { name: "40 Eridani",      l: 200.80, b: -38.00, d: 16.45, color: "#3a6e8a", dest: true, sub: "Rocky's planet", anchor: "start", dx: 14, dy: -8, displayName: "40 Eridani" },
+  ];
+
+  // --- interactive trip state ---
+  // currentTrip describes what the trip-detail panel is showing.
+  //   label       : route label (e.g., "Proxima Centauri")
+  //   d_ly        : true distance in light-years
+  //   mapStarName : name of a STARS entry whose dot the map line/beads
+  //                 should follow, or null for off-map destinations
+  let currentTrip = { label: "Tau Ceti", d_ly: 11.91, mapStarName: "Tau Ceti" };
+  let animStart   = 0;
+  const LOOP_MS   = 16000;
+  const N_BEADS   = 14;
+
+  const PRESETS = {
+    "Proxima Centauri": { label: "Proxima Centauri", d_ly: 4.246,      mapStarName: "Alpha Centauri" },
+    "Tau Ceti":         { label: "Tau Ceti",         d_ly: 11.91,      mapStarName: "Tau Ceti" },
+  };
+
+  function fmtTime(seconds) {
+    const yr = seconds / YR;
+    if (yr < 1 / 365) return (seconds / 3600).toFixed(1) + " hr";
+    if (yr < 1)       return (yr * 365.25).toFixed(1) + " days";
+    if (yr < 100)     return yr.toFixed(2) + " yr";
+    return Math.round(yr).toLocaleString("en-US") + " yr";
+  }
+  function fmtGamma(g) {
+    return g > 100 ? g.toFixed(0) : g.toFixed(2);
+  }
+  // Formatter for the inline spacetime labels — decimal years for whole-year
+  // scale, naturalistic "X yr Y mo" only for sub-year values.
+  // 13.13 yr → "13.1 yr",  6.56 yr → "6.6 yr",  0.67 yr → "0 yr 8 mo",
+  // 0.03 yr → "12 d",  0 → "0 yr".
+  function fmtTimeFriendly(seconds) {
+    const s = Math.max(0, seconds);
+    const yr = s / YR;
+    if (yr >= 100)  return Math.round(yr).toLocaleString("en-US") + " yr";
+    if (yr >= 1)    return yr.toFixed(1) + " yr";
+    if (yr >= 0.05) return yr.toFixed(1) + " yr";
+    if (yr >= 0.01) return yr.toFixed(2) + " yr";
+    return "0 yr";
+  }
+
+  const STAR_BY_NAME = Object.fromEntries(STARS.map(s => [s.name, s]));
+
+  // Map projection (used by both starmap and animation)
+  const CX = 380, CY = 400, SCALE = 20;
+  const toRad = d => d * Math.PI / 180;
+  // Polar layout: keep the projection's angular direction (l, b) but place
+  // each star at its TRUE distance d from Sol on the map, so the range
+  // rings actually mean what they say. A whole-map rotation is then
+  // applied so the user can orient the layout however they like.
+  const MAP_ROT_DEG = 160;                       // clockwise on screen
+  const _rotA = toRad(MAP_ROT_DEG);
+  const _rotC = Math.cos(_rotA), _rotS = Math.sin(_rotA);
+  function project(s) {
+    if (!s.d) return { X: 0, Y: 0 };
+    const lr = toRad(s.l), br = toRad(s.b);
+    const px = Math.cos(br) * Math.cos(lr);
+    const py = Math.cos(br) * Math.sin(lr);
+    const m  = Math.hypot(px, py) || 1;
+    const X0 = s.d * (px / m), Y0 = s.d * (py / m);
+    // Screen-CW rotation by α  ≡  math-CCW by −α  (because toScreen flips Y).
+    const X = X0 * _rotC + Y0 * _rotS;
+    const Y = -X0 * _rotS + Y0 * _rotC;
+    return { X, Y };
+  }
+  const toScreen = ({ X, Y }) => ({ sx: CX + X * SCALE, sy: CY - Y * SCALE });
+  const screenOf = name => toScreen(project(STAR_BY_NAME[name]));
+
+  // Per-destination trip statistics at the current proper acceleration.
+  function tripStats(d_ly) {
+    if (d_ly <= 0) return { D: 0, tauOneway: 0, TeOneway: 0, gammaPeak: 1, betaPeak: 0 };
+    const a     = aSI();
+    const Dm    = d_ly * LY;
+    const halfD = Dm / 2;
+    const th    = (C / a) * Math.acosh(1 + a * halfD / (C * C));
+    const Th    = Math.sqrt((halfD / C) ** 2 + 2 * halfD / a);
+    const gP    = 1 + a * halfD / (C * C);
+    const bP    = Math.sqrt(1 - 1 / (gP * gP));
+    return { D: Dm, tauOneway: 2 * th, TeOneway: 2 * Th, gammaPeak: gP, betaPeak: bP };
+  }
+
+  // Per-leg geometry: each leg covers halfD in distance and TeHalf/tauHalf in time.
+  // Leg 0 = accel +x, leg 1 = decel +x, leg 2 = accel -x, leg 3 = decel -x.
+  // Returns position (in ly), Earth time (sec), γ, |β|, and direction sign.
+  function legState(legIdx, tInLegSec, isShipTime, stats) {
+    const a = aSI();
+    const halfD = stats.D / 2;
+    const TeHalf  = stats.TeOneway / 2;
+    const tauHalf = stats.tauOneway / 2;
+    let gamma, xInLeg, teInLeg;
+    if (legIdx % 2 === 0) {
+      // accel-from-rest
+      if (isShipTime) {
+        gamma = Math.cosh(a * tInLegSec / C);
+        xInLeg = (C * C / a) * (gamma - 1);
+        teInLeg = (C / a) * Math.sinh(a * tInLegSec / C);
+      } else {
+        gamma = Math.sqrt(1 + (a * tInLegSec / C) ** 2);
+        xInLeg = (C * C / a) * (gamma - 1);
+        teInLeg = tInLegSec;
+      }
+    } else {
+      // decel-to-rest (mirror)
+      if (isShipTime) {
+        const tauPrime = tauHalf - tInLegSec;
+        gamma = Math.cosh(a * tauPrime / C);
+        xInLeg = halfD - (C * C / a) * (gamma - 1);
+        teInLeg = TeHalf - (C / a) * Math.sinh(a * tauPrime / C);
+      } else {
+        const tm = TeHalf - tInLegSec;
+        gamma = Math.sqrt(1 + (a * tm / C) ** 2);
+        xInLeg = halfD - (C * C / a) * (gamma - 1);
+        teInLeg = tInLegSec;
+      }
+    }
+    const beta = Math.sqrt(Math.max(0, 1 - 1 / (gamma * gamma)));
+    // Translate leg-local x to absolute x on the [0, D] line
+    let x, sign;
+    switch (legIdx) {
+      case 0: x = xInLeg;             sign =  1; break;  // accel out
+      case 1: x = halfD + xInLeg;     sign =  1; break;  // decel out
+      case 2: x = stats.D - xInLeg;   sign = -1; break;  // accel back
+      case 3: x = halfD - xInLeg;     sign = -1; break;  // decel back
+    }
+    return { gamma, beta, betaSigned: sign * beta, x, teInLeg };
+  }
+
+  // Physical state at normalised Earth time u ∈ [0, 1] over N legs.
+  function tripStateAtU(u, stats) {
+    const N = nLegs();
+    const TeHalf = stats.TeOneway / 2;
+    const TeTotal = N * TeHalf;
+    const t = u * TeTotal;
+    const legIdx = Math.min(Math.floor(t / TeHalf), N - 1);
+    const tInLeg = t - legIdx * TeHalf;
+    const s = legState(legIdx, tInLeg, false, stats);
+    return { gamma: s.gamma, beta: s.beta, betaSigned: s.betaSigned, frac: stats.D ? s.x / stats.D : 0, legIdx };
+  }
+
+  // Physical state at normalised ship time τ ∈ [0, 1] over N legs.
+  function tripStateAtTauNorm(tauNorm, stats) {
+    const N = nLegs();
+    const tauHalf = stats.tauOneway / 2;
+    const tauTotal = N * tauHalf;
+    const TeHalf = stats.TeOneway / 2;
+    const TeTotal = N * TeHalf;
+    const tau = tauNorm * tauTotal;
+    const legIdx = Math.min(Math.floor(tau / tauHalf), N - 1);
+    const tauInLeg = tau - legIdx * tauHalf;
+    const s = legState(legIdx, tauInLeg, true, stats);
+    const te = legIdx * TeHalf + s.teInLeg;
+    return {
+      gamma: s.gamma, beta: s.beta, betaSigned: s.betaSigned,
+      frac:    stats.D ? s.x / stats.D : 0,
+      te_sec:  te,
+      teFrac:  TeTotal ? te / TeTotal : 0,
+      legIdx,
+    };
+  }
+
+  // Ship's position as a function of normalised proper (ship) time.
+  // Equal-step τ samples make the beads bunch tightly at endpoints and
+  // spread dramatically through the relativistic middle — because in the
+  // ship's frame each year of effort covers exponentially more distance
+  // once γ has climbed.
+  function fracAtTauNorm(tauNorm, stats) {
+    const a = aSI();
+    if (!stats.D) return 0;
+    let x;
+    if (tauNorm <= 0.5) {
+      const tau = tauNorm * stats.tauOneway;
+      x = (C * C / a) * (Math.cosh(a * tau / C) - 1);
+    } else {
+      const tauPrime = (1 - tauNorm) * stats.tauOneway;
+      x = stats.D - (C * C / a) * (Math.cosh(a * tauPrime / C) - 1);
+    }
+    return x / stats.D;
+  }
+
+  // Pick a sensible ship-time step so we get 5–15 beads per trip.
+  function beadStep(tauTotalSec) {
+    const yr = tauTotalSec / YR;
+    if (yr >= 100)   return { sec: 10 * YR,        label: "10 ship-yr" };
+    if (yr >= 30)    return { sec:  5 * YR,        label: "5 ship-yr" };
+    if (yr >= 4)     return { sec:      YR,        label: "1 ship-yr" };
+    if (yr >= 1.5)   return { sec: 0.5 * YR,       label: "6 ship-months" };
+    if (yr >= 0.25)  return { sec: YR / 12,        label: "1 ship-month" };
+    if (yr >= 0.02)  return { sec: 7 * 86400,      label: "1 ship-week" };
+    if (yr >= 0.003) return { sec: 86400,          label: "1 ship-day" };
+    return { sec: tauTotalSec / 11, label: "1/12 of trip" };
+  }
+
+  // Ship's proper time elapsed when Earth-frame clock reads teSec.
+  // Inverse of earthTimeAtTau — used by the live progress bars.
+  function shipTimeAtTe(teSec, stats) {
+    const a = aSI();
+    const half = stats.TeOneway / 2;
+    if (teSec <= half) {
+      return (C / a) * Math.asinh(a * teSec / C);
+    }
+    const dt = stats.TeOneway - teSec;
+    return stats.tauOneway - (C / a) * Math.asinh(a * dt / C);
+  }
+
+  // Earth-frame time at which the ship's proper clock reads tauSec.
+  // Needed to place proper-time ticks on the Minkowski worldline at (x, t_e).
+  function earthTimeAtTau(tauSec, stats) {
+    const a = aSI();
+    const halfTau = stats.tauOneway / 2;
+    if (tauSec <= halfTau) {
+      return (C / a) * Math.sinh(a * tauSec / C);
+    }
+    const tauPrime = stats.tauOneway - tauSec;
+    return stats.TeOneway - (C / a) * Math.sinh(a * tauPrime / C);
+  }
+
+  // Pick a "nice" round axis-tick step for a given range.
+  function pickTickStep(max) {
+    if (max <= 6)   return 1;
+    if (max <= 14)  return 2;
+    if (max <= 40)  return 5;
+    if (max <= 80)  return 10;
+    return Math.pow(10, Math.floor(Math.log10(max)));
+  }
+
+  // --- static star map (rebuilt on selection change) ---
+  function renderStarmap() {
+    const svg = document.getElementById("starmap");
+    const parts = [];
+
+    // Title + subtitle inside the SVG, top-left
+    parts.push(`<text class="diagram-title"    x="30" y="38" text-anchor="start">Spatial view</text>`);
+    parts.push(`<text class="diagram-subtitle" x="30" y="62" text-anchor="start">nearby stars from above &middot; click one to retarget the ship</text>`);
+
+    // Range rings — labels sit along the horizontal radius through Sol
+    for (const r of [5, 10, 15]) {
+      parts.push(`<circle class="ring" cx="${CX}" cy="${CY}" r="${r * SCALE}"/>`);
+      parts.push(`<text class="ring-label" x="${CX + r * SCALE - 6}" y="${CY + 18}" text-anchor="end">${r} ly</text>`);
+    }
+
+    const p1 = screenOf("Sol");
+    const p2 = screenOf(currentTrip.mapStarName);
+    parts.push(`<line class="trip-line" x1="${p1.sx.toFixed(1)}" y1="${p1.sy.toFixed(1)}" x2="${p2.sx.toFixed(1)}" y2="${p2.sy.toFixed(1)}"/>`);
+
+    // Stars: render name+dot+labels. Hit target is a larger transparent circle.
+    for (const s of STARS) {
+      const { sx, sy } = toScreen(project(s));
+      const isSel = s.name === currentTrip.mapStarName;
+      const hasColor = !!s.color;
+      const dotCls = s.sol ? "star-sol" : "star";
+      const r = s.sol ? 3.6 : (hasColor ? 4.2 : 3.2);
+      const fill = hasColor ? ` fill="${s.color}"` : "";
+      const ringStroke = "var(--accent)";
+
+      // Hit area first (transparent, larger)
+      if (!s.sol) {
+        parts.push(`<circle class="star-hit" data-name="${s.name}" cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="18"/>`);
+      }
+      parts.push(`<circle class="${dotCls} star-render" cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="${r}"${fill}/>`);
+
+      // Selected destination gets an open accent ring around its dot, in the star's own color
+      if (isSel && !s.sol) {
+        parts.push(`<circle class="star-render" cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="10" fill="none" stroke="${ringStroke}" stroke-width="1.4"/>`);
+      }
+
+      const lx = sx + s.dx, ly = sy + s.dy;
+      const label = s.displayName || s.name;
+      parts.push(`<text class="star-name star-render" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${s.anchor}">${label}</text>`);
+      if (!s.sol) {
+        parts.push(`<text class="star-dist star-render" x="${lx.toFixed(1)}" y="${(ly + 16).toFixed(1)}" text-anchor="${s.anchor}">${s.d.toFixed(2)} ly</text>`);
+      }
+      if (s.sub) {
+        parts.push(`<text class="star-sub star-render" x="${lx.toFixed(1)}" y="${(ly + 32).toFixed(1)}" text-anchor="${s.anchor}" fill="${s.color || 'var(--accent)'}">${s.sub}</text>`);
+      }
+    }
+
+    // Beads sit at equal proper-time (ship-time) intervals along the line, so
+    // they bunch tightly near Sol and the destination and sprawl through the
+    // relativistic middle.
+    const beadStats = tripStats(currentTrip.d_ly);
+    const step      = beadStep(beadStats.tauOneway);
+    const dxL = p2.sx - p1.sx, dyL = p2.sy - p1.sy;
+    for (let tau = step.sec; tau < beadStats.tauOneway - step.sec * 0.01; tau += step.sec) {
+      const fr = fracAtTauNorm(tau / beadStats.tauOneway, beadStats);
+      const bx = p1.sx + dxL * fr;
+      const by = p1.sy + dyL * fr;
+      parts.push(`<circle class="bead" cx="${bx.toFixed(2)}" cy="${by.toFixed(2)}" r="3"/>`);
+    }
+    parts.push(`<circle id="ship-glow" class="ship-glow" cx="${p1.sx}" cy="${p1.sy}" r="11"/>`);
+    parts.push(`<circle id="ship-dot"  class="ship-dot"  cx="${p1.sx}" cy="${p1.sy}" r="5.5"/>`);
+
+    // Stash endpoints for the animation loop
+    renderStarmap.p1 = p1;
+    renderStarmap.p2 = p2;
+
+    svg.innerHTML = parts.join("\n");
+  }
+
+  // --- Minkowski spacetime diagram (rebuilt on selection / accel change) ---
+  function renderSpacetime() {
+    const svg = document.getElementById("spacetime");
+    const PX0 = 130, PX1 = 720;
+    const PY0 = 680, PY1 = 110;
+    const wAvail = PX1 - PX0, hAvail = PY0 - PY1;
+
+    const stats = tripStats(currentTrip.d_ly);
+    const D_ly  = currentTrip.d_ly;
+    const N     = nLegs();
+    const TeHalf_yr = stats.TeOneway / 2 / YR;
+    const T_yr  = N * TeHalf_yr;            // total Earth time across all legs
+    // One-way: equal physical scale on both axes so the light cone is
+    // exactly 45°. Round-trip: T_yr is ~2× larger, which would squeeze
+    // the diagram into a pencil-thin column — so we let the x-axis
+    // stretch independently, accepting that the light cone is no longer
+    // drawn at 45°. Pad the y range so the worldline's top point has
+    // breathing room above it instead of slamming into the plot edge.
+    const T_yr_pad = T_yr * 1.12;
+    const isRound = N === 4;
+    const equalScale = Math.min(wAvail / D_ly, hAvail / T_yr_pad);
+    const xScale = isRound
+      ? Math.min(wAvail / D_ly, equalScale * 1.4)
+      : equalScale;
+    const yScale = isRound ? hAvail / T_yr_pad : equalScale;
+    const xPx = ly => PX0 + ly * xScale;
+    const yPx = yr => PY0 - yr * yScale;
+
+    const parts = [];
+
+    // Title + subtitle inside the SVG, top-left
+    parts.push(`<text class="diagram-title"    x="30" y="38" text-anchor="start">Spacetime view</text>`);
+    parts.push(`<text class="diagram-subtitle" x="30" y="62" text-anchor="start">time runs up the page, distance across &middot; each dashed line is one observer's &lsquo;now&rsquo;</text>`);
+
+    // Range-frame axes (only span data range)
+    parts.push(`<line class="st-axis" x1="${PX0}" y1="${PY0}" x2="${xPx(D_ly).toFixed(2)}" y2="${PY0}"/>`);
+    parts.push(`<line class="st-axis" x1="${PX0}" y1="${PY0}" x2="${PX0}" y2="${yPx(T_yr_pad).toFixed(2)}"/>`);
+
+    // Endpoint labels only — no intermediate ticks
+    parts.push(`<text class="st-tick-label" x="${PX0}" y="${PY0 + 17}" text-anchor="middle">0</text>`);
+    parts.push(`<text class="st-tick-label" x="${xPx(D_ly).toFixed(2)}" y="${PY0 + 17}" text-anchor="middle">${D_ly.toFixed(2)} ly</text>`);
+    parts.push(`<text class="st-tick-label" x="${PX0 - 6}" y="${(PY0 + 4).toFixed(2)}" text-anchor="end">0</text>`);
+    parts.push(`<text class="st-tick-label" x="${PX0 - 6}" y="${(yPx(T_yr) + 4).toFixed(2)}" text-anchor="end">${T_yr.toFixed(1)} yr</text>`);
+
+    // Axis titles — y rotated vertically along left, x centered below
+    const midY = (PY0 + yPx(T_yr)) / 2;
+    const midX = (PX0 + xPx(D_ly)) / 2;
+    parts.push(`<text class="st-axis-title" x="${PX0 - 95}" y="${midY.toFixed(2)}" text-anchor="middle" transform="rotate(-90 ${PX0 - 95} ${midY.toFixed(2)})">time since departure (years)</text>`);
+    parts.push(`<text class="st-axis-title" x="${midX.toFixed(2)}" y="${PY0 + 42}" text-anchor="middle">distance from Earth (light&#8209;years)</text>`);
+
+    // Light cone from departure (1 ly per 1 yr → 45°)
+    const lcEnd = Math.min(D_ly, T_yr);
+    parts.push(`<line class="st-lightcone" x1="${xPx(0)}" y1="${yPx(0)}" x2="${xPx(lcEnd).toFixed(2)}" y2="${yPx(lcEnd).toFixed(2)}"/>`);
+    parts.push(`<text class="lightcone-inline-label" x="${(xPx(lcEnd * 0.62) + 12).toFixed(2)}" y="${(yPx(lcEnd * 0.62) - 6).toFixed(2)}" text-anchor="start">light's path &middot; 1 ly per year${isRound ? "" : " &rArr; 45&deg;"}</text>`);
+
+    // Ship worldline (parametrised by normalised Earth time u)
+    const NSAMPLES = 240;
+    let path = "";
+    for (let i = 0; i <= NSAMPLES; i++) {
+      const u = i / NSAMPLES;
+      const { frac } = tripStateAtU(u, stats);
+      const x = frac * D_ly;
+      const t = u * T_yr;
+      path += `${i === 0 ? "M" : "L"}${xPx(x).toFixed(2)},${yPx(t).toFixed(2)} `;
+    }
+    parts.push(`<path class="st-worldline" d="${path}"/>`);
+
+    // Proper-time ticks on the worldline, spanning the full trip (all N legs).
+    const tauTotalSec = N * stats.tauOneway / 2;
+    const step = beadStep(tauTotalSec);
+    for (let tau = step.sec; tau < tauTotalSec - step.sec * 0.01; tau += step.sec) {
+      const st = tripStateAtTauNorm(tau / tauTotalSec, stats);
+      const x  = st.frac * D_ly;
+      const te = st.te_sec / YR;
+      parts.push(`<circle class="bead" cx="${xPx(x).toFixed(2)}" cy="${yPx(te).toFixed(2)}" r="3"/>`);
+    }
+
+    // Flip / turnaround markers at each inter-leg boundary
+    for (let k = 1; k < N; k++) {
+      // Boundary k is at Earth time k * TeHalf. By leg geometry:
+      //   k=1 (one-way flip): (D/2, TeHalf)
+      //   k=2 (turnaround):   (D,   2·TeHalf)
+      //   k=3 (return flip):  (D/2, 3·TeHalf)
+      const xAt = (k % 2 === 1) ? D_ly / 2 : D_ly;
+      const tAt = k * TeHalf_yr;
+      parts.push(`<rect class="st-flip-mark" x="${(xPx(xAt) - 3.5).toFixed(2)}" y="${(yPx(tAt) - 3.5).toFixed(2)}" width="7" height="7"/>`);
+    }
+
+    // Dashed simultaneity lines (placeholders; endpoints updated per frame)
+    parts.push(`<line id="sim-line-earth" class="sim-line-earth" x1="${xPx(0)}" y1="${yPx(0)}" x2="${xPx(D_ly).toFixed(2)}" y2="${yPx(0)}"/>`);
+    parts.push(`<line id="sim-line-ship"  class="sim-line-ship"  x1="${xPx(0)}" y1="${yPx(0)}" x2="${xPx(D_ly).toFixed(2)}" y2="${yPx(0)}"/>`);
+
+    // Inline intersection markers + labels at Sol's worldline (updated per frame)
+    parts.push(`<circle id="sim-inter-earth" class="sim-inter-earth" cx="${xPx(0)}" cy="${yPx(0)}" r="4.5"/>`);
+    parts.push(`<text   id="sim-inter-earth-label" class="sim-inter-earth-label" x="${xPx(0) - 14}" y="${(yPx(0) - 8).toFixed(2)}" text-anchor="end">Earth</text>`);
+    parts.push(`<circle id="sim-inter-ship" class="sim-inter-ship" cx="${xPx(0)}" cy="${yPx(0)}" r="4.5"/>`);
+    parts.push(`<text   id="sim-inter-ship-label" class="sim-inter-ship-label" x="${xPx(0) - 14}" y="${(yPx(0) + 16).toFixed(2)}" text-anchor="end">ship sees Earth at &mdash;</text>`);
+
+    // Gap bracket — sits just inside the plot, to the right of the y-axis
+    const gapX = PX0 + 18;
+    parts.push(`<line id="gap-bracket" class="gap-bracket" x1="${gapX}" y1="${yPx(0)}" x2="${gapX}" y2="${yPx(0)}"/>`);
+    parts.push(`<line id="gap-cap-top" class="gap-cap" x1="${gapX - 4}" y1="${yPx(0)}" x2="${gapX + 4}" y2="${yPx(0)}"/>`);
+    parts.push(`<line id="gap-cap-bot" class="gap-cap" x1="${gapX - 4}" y1="${yPx(0)}" x2="${gapX + 4}" y2="${yPx(0)}"/>`);
+    parts.push(`<text id="gap-label"   class="gap-label" x="${gapX + 8}" y="${yPx(0)}" text-anchor="start">gap &mdash;</text>`);
+
+    // Current position on the worldline (open circle, updated per frame)
+    parts.push(`<circle id="st-ship-dot" class="current-pos" cx="${xPx(0)}" cy="${yPx(0)}" r="7"/>`);
+
+    svg.innerHTML = parts.join("\n");
+    renderSpacetime.bounds = { xPx, yPx, D_ly, T_yr, stats, gapX };
+  }
+
+  // --- static trip-detail numbers ---
+  function renderTripStats() {
+    const stats = tripStats(currentTrip.d_ly);
+    const dStr = currentTrip.d_ly < 0.001
+      ? currentTrip.d_ly.toExponential(2) + " ly"
+      : currentTrip.d_ly < 100
+        ? currentTrip.d_ly.toFixed(2) + " ly"
+        : currentTrip.d_ly.toLocaleString("en-US") + " ly";
+    const N = nLegs();
+    const isRound = N === 4;
+
+    // Scenario title — single-line summary of the whole configuration
+    const setText = (id, s) => { const el = document.getElementById(id); if (el) el.textContent = s; };
+    setText("sc-dest",  currentTrip.label);
+    setText("sc-mode",  isRound ? "(round-trip)" : "");
+    setText("sc-dist",  dStr);
+    setText("sc-accel", `${accel_g.toFixed(2)} g`);
+    setText("sc-peak",  `${(stats.betaPeak * 100).toFixed(2)}%`);
+
+    setText("stat-earth", fmtTime((N / 2) * stats.TeOneway));
+    setText("stat-ship",  fmtTime((N / 2) * stats.tauOneway));
+    setText("stat-gamma", fmtGamma(stats.gammaPeak));
+    setText("stat-vel",   `${stats.betaPeak.toFixed(4)} c`);
+
+    renderRegime();
+  }
+
+  // --- arrival / regime readouts ---
+  // The regime sentence is a coarse, trip-level label — recomputing it on
+  // every animation frame makes the text flicker between "Mildly" and
+  // "Deeply" relativistic as γ rises and falls during the deceleration
+  // phase. We pick it once per trip configuration, based on peak γ, and
+  // use the average Earth/ship time ratio for the multiplier.
+  // At the end of each loop the ship is at rest (one-way: at the
+  // destination; round-trip: back home) and we flash a closing readout
+  // — see PAUSE_MS in frame().
+  let cachedRegimeHTML = "";
+  let cachedArrivalHTML = "";
+  let liveRegimeMode = null;  // "regime" | "arrival" — what's currently in the DOM
+  const PAUSE_MS = 2200;
+
+  function renderRegime() {
+    const stats  = tripStats(currentTrip.d_ly);
+    const N      = nLegs();
+    const TeTot  = (N / 2) * stats.TeOneway;
+    const tauTot = (N / 2) * stats.tauOneway;
+    const gPeak  = stats.gammaPeak;
+    const ratio  = tauTot > 0 ? TeTot / tauTot : 1;
+
+    let regime, blurb;
+    if      (gPeak < 1.05) { regime = "Subrelativistic";     blurb = "Almost no time dilation yet."; }
+    else if (gPeak < 1.5)  { regime = "Mildly relativistic"; blurb = "A taste of the gap opening up."; }
+    else if (gPeak < 5)    { regime = "Relativistic regime"; blurb = "Decades at home, years on board."; }
+    else if (gPeak < 20)   { regime = "Deeply relativistic"; blurb = "A lifetime at home for a few years aboard."; }
+    else                   { regime = "Ultra-relativistic";  blurb = "Whole epochs slip past Earth between heartbeats."; }
+
+    cachedRegimeHTML =
+      `<em>${regime}</em> &mdash; Earth ages ` +
+      `<span class="accent">${ratio.toFixed(1)}&times;</span> faster than the ship. ` +
+      `<span>${blurb}</span>`;
+
+    const gap = Math.max(0, TeTot - tauTot);
+    const isRound = N === 4;
+    cachedArrivalHTML = isRound
+      ? `<strong>Reunion on Earth.</strong> Grace aged ` +
+        `<span class="accent">${fmtTimeFriendly(tauTot)}</span> &middot; Earth aged ` +
+        `<span class="accent">${fmtTimeFriendly(TeTot)}</span> &middot; the traveller is now ` +
+        `<span class="accent">${fmtTimeFriendly(gap)}</span> younger than their stay&#8209;home twin.`
+      : `<strong>Arrival at ${currentTrip.label}.</strong> Grace aged ` +
+        `<span class="accent">${fmtTimeFriendly(tauTot)}</span> &middot; Earth aged ` +
+        `<span class="accent">${fmtTimeFriendly(TeTot)}</span> &middot; the ship is now ` +
+        `<span class="accent">${fmtTimeFriendly(gap)}</span> younger than the people they left behind.`;
+
+    // Force the next frame to re-write the DOM (in case the new content
+    // differs from whatever was just on screen).
+    liveRegimeMode = null;
+  }
+
+  // --- per-frame animation update ---
+  function frame(now) {
+    if (!animStart) animStart = now;
+    const CYCLE_MS   = LOOP_MS + PAUSE_MS;
+    const elapsedRaw = (now - animStart) % CYCLE_MS;
+    const inPause    = elapsedRaw >= LOOP_MS;
+    const tNorm      = inPause ? 1.0 : elapsedRaw / LOOP_MS;
+    const stats = tripStats(currentTrip.d_ly);
+    const stLead = tripStateAtTauNorm(tNorm, stats);
+
+    // Animated ship dot moving along the trip line (beads are static).
+    const p1 = renderStarmap.p1, p2 = renderStarmap.p2;
+    if (p1 && p2) {
+      const dx = p2.sx - p1.sx, dy = p2.sy - p1.sy;
+      const sx = p1.sx + dx * stLead.frac;
+      const sy = p1.sy + dy * stLead.frac;
+      const dot  = document.getElementById("ship-dot");
+      const glow = document.getElementById("ship-glow");
+      if (dot)  { dot.setAttribute("cx",  sx.toFixed(2));  dot.setAttribute("cy",  sy.toFixed(2)); }
+      if (glow) {
+        glow.setAttribute("cx", sx.toFixed(2));
+        glow.setAttribute("cy", sy.toFixed(2));
+        const gFrac = (stLead.gamma - 1) / Math.max(0.001, stats.gammaPeak - 1);
+        glow.setAttribute("r", (5 + 9 * gFrac).toFixed(2));
+      }
+    }
+
+    // Spacetime — current position, simultaneity lines, intersection labels, gap bracket
+    const sb = renderSpacetime.bounds;
+    if (sb) {
+      const xs = stLead.frac * sb.D_ly;          // ship's distance from Sol (ly)
+      const ts = stLead.te_sec / YR;             // current Earth time (yr)
+      const bs   = stLead.betaSigned;            // + outbound, − return leg
+      const stx = sb.xPx(xs);
+      const sty = sb.yPx(ts);
+
+      // Current position open-circle on the worldline
+      const sDot = document.getElementById("st-ship-dot");
+      if (sDot) { sDot.setAttribute("cx", stx.toFixed(2)); sDot.setAttribute("cy", sty.toFixed(2)); }
+
+      // Earth's "now" — horizontal line at t = ts
+      const earthLine = document.getElementById("sim-line-earth");
+      if (earthLine) {
+        earthLine.setAttribute("y1", sty.toFixed(2));
+        earthLine.setAttribute("y2", sty.toFixed(2));
+      }
+
+      // Ship's "now" — slope dt/dx = β_signed through (xs, ts). On the return
+      // leg β_signed is negative, so the line tilts the opposite way and the
+      // ship's reading of Earth's clock surges past Earth's actual time.
+      //   at x=0: t = ts - β_signed·xs
+      //   at x=D: t = ts + β_signed·(D - xs)
+      const tAtSol  = ts - bs * xs;
+      const tAtDest = ts + bs * (sb.D_ly - xs);
+      const yAtSol  = sb.yPx(tAtSol);
+      const yAtDest = sb.yPx(tAtDest);
+      const shipLine = document.getElementById("sim-line-ship");
+      if (shipLine) {
+        shipLine.setAttribute("y1", yAtSol.toFixed(2));
+        shipLine.setAttribute("y2", yAtDest.toFixed(2));
+      }
+
+      // Inline intersection markers on Sol's worldline (x=0):
+      //   "Earth: X yr Y mo"     — filled black dot at Earth's clock
+      //   "ship sees Earth at …" — open red circle at the ship's "now" reading
+      const eDot   = document.getElementById("sim-inter-earth");
+      const eLab   = document.getElementById("sim-inter-earth-label");
+      const sDotI  = document.getElementById("sim-inter-ship");
+      const sLab   = document.getElementById("sim-inter-ship-label");
+      // During the return leg the ship's "now" overtakes Earth's clock, so the
+      // open red circle ends up ABOVE the Earth dot (smaller screen-y). Swap
+      // which label goes above and which goes below so they don't collide.
+      const outbound = ts >= tAtSol;
+      if (eDot) { eDot.setAttribute("cy", sty.toFixed(2)); }
+      if (sDotI){ sDotI.setAttribute("cy", yAtSol.toFixed(2)); }
+      if (eLab) { eLab.setAttribute("y", (sty + (outbound ? -10 : 18)).toFixed(2));
+                  eLab.textContent = `earth ${fmtTimeFriendly(ts * YR)}`; }
+      if (sLab) { sLab.setAttribute("y", (yAtSol + (outbound ? 16 : -8)).toFixed(2));
+                  sLab.textContent = `ship ${fmtTimeFriendly(tAtSol * YR)}`; }
+
+      // Gap bracket — magnitude of the disagreement, regardless of sign
+      const gap = Math.abs(bs) * xs;
+      const yTop = Math.min(sty, yAtSol);
+      const yBot = Math.max(sty, yAtSol);
+      const yMid = (yTop + yBot) / 2;
+      const gx = sb.gapX;
+      const bracket = document.getElementById("gap-bracket");
+      const capTop  = document.getElementById("gap-cap-top");
+      const capBot  = document.getElementById("gap-cap-bot");
+      const gLab    = document.getElementById("gap-label");
+      if (bracket) { bracket.setAttribute("y1", yTop.toFixed(2)); bracket.setAttribute("y2", yBot.toFixed(2)); }
+      if (capTop)  { capTop.setAttribute("y1", yTop.toFixed(2));  capTop.setAttribute("y2", yTop.toFixed(2)); }
+      if (capBot)  { capBot.setAttribute("y1", yBot.toFixed(2));  capBot.setAttribute("y2", yBot.toFixed(2)); }
+      if (gLab)    { gLab.setAttribute("y", (yMid + 4).toFixed(2));
+                     gLab.textContent = `gap ${gap.toFixed(gap < 1 ? 2 : 1)} yr`; }
+    }
+
+    // Live progress bars — current ship state
+    {
+      const N      = nLegs();
+      const TeTot  = (N / 2) * stats.TeOneway;
+      const tauTot = (N / 2) * stats.tauOneway;
+      // During the arrival/reunion pause we freeze on the final state:
+      // ship at rest (β=0, γ=1), Grace and Earth bars at their trip totals.
+      const teNow  = inPause ? TeTot  : stLead.te_sec;
+      const tauNow = inPause ? tauTot : tNorm * tauTot;
+      const beta   = inPause ? 0 : stLead.beta;
+      const gamma  = inPause ? 1 : stLead.gamma;
+      const gPeak  = Math.max(stats.gammaPeak, 1.0001);
+      const gFrac  = inPause ? 0 : (gamma - 1) / (gPeak - 1);
+
+      const setW = (id, pct) => {
+        const el = document.getElementById(id);
+        if (el) el.style.width = Math.max(0, Math.min(100, pct)) + "%";
+      };
+      const setT = (id, txt) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = txt;
+      };
+
+      // Bars are shown as percent of the trip's Earth time, so the gap
+      // between Grace's bar and Earth's bar is the dilation made visible.
+      setW("bar-fill-grace", 100 * tauNow / TeTot);
+      setW("bar-fill-earth", 100 * teNow  / TeTot);
+      setW("bar-fill-speed", 100 * beta);
+      setW("bar-fill-gamma", 100 * gFrac);
+
+      setT("bar-val-grace", fmtTimeFriendly(tauNow));
+      setT("bar-val-earth", fmtTimeFriendly(teNow));
+      setT("bar-val-speed", (100 * beta).toFixed(1) + "% c");
+      setT("bar-val-gamma", fmtGamma(gamma) + " ×");
+
+      const gStr = fmtGamma(gamma);
+      setT("live-gamma",  gStr);
+      setT("live-gamma2", gStr);
+
+      // Swap regime ↔ arrival sentence only when the mode flips, so we
+      // aren't re-writing innerHTML every frame.
+      const wantMode = inPause ? "arrival" : "regime";
+      if (wantMode !== liveRegimeMode) {
+        const el = document.getElementById("live-regime");
+        if (el) el.innerHTML = wantMode === "arrival" ? cachedArrivalHTML : cachedRegimeHTML;
+        el?.classList.toggle("is-arrival", wantMode === "arrival");
+        liveRegimeMode = wantMode;
+      }
+    }
+
+    requestAnimationFrame(frame);
+  }
+
+  // --- selection handling ---
+  function setTrip(trip, originPresetKey) {
+    currentTrip = trip;
+    animStart = 0;
+    // Toggle active state only on destination preset buttons (those with [data-preset])
+    document.querySelectorAll("[data-preset]").forEach(b => {
+      b.classList.toggle("active", b.dataset.preset === originPresetKey);
+    });
+    renderStarmap();
+    renderSpacetime();
+    renderTripStats();
+  }
+
+  function selectStar(name) {
+    if (name === "Sol" || !STAR_BY_NAME[name]) return;
+    const star = STAR_BY_NAME[name];
+    setTrip({ label: name, d_ly: star.d, mapStarName: name }, null);
+  }
+
+  function setTripMode(mode) {
+    if (mode === tripMode || (mode !== "oneway" && mode !== "roundtrip")) return;
+    tripMode = mode;
+    animStart = 0;
+    document.querySelectorAll("[data-mode]").forEach(b => {
+      b.classList.toggle("active", b.dataset.mode === mode);
+    });
+    renderStarmap();
+    renderSpacetime();
+    renderTripStats();
+  }
+
+  document.getElementById("starmap").addEventListener("click", e => {
+    const name = e.target?.dataset?.name;
+    if (name) selectStar(name);
+  });
+
+  // Trip-mode toggle (one-way ↔ round-trip)
+  document.querySelectorAll("[data-mode]").forEach(btn => {
+    btn.addEventListener("click", () => setTripMode(btn.dataset.mode));
+  });
+
+  const slider = document.getElementById("accel-slider");
+  const readout = document.getElementById("accel-readout");
+  slider.addEventListener("input", () => {
+    accel_g = parseFloat(slider.value);
+    readout.textContent = `${accel_g.toFixed(1)} g`;
+    renderStarmap();   // bead spacing depends on a
+    renderSpacetime(); // worldline + ticks depend on a
+    renderTripStats();
+  });
+
+  renderStarmap();
+  renderSpacetime();
+  renderTripStats();
+  requestAnimationFrame(frame);
+
+  // --- light-clock animation -------------------------------------------
+  // Two side-by-side clocks visualised in the lab frame. The moving
+  // clock's photon must travel diagonally to stay between its mirrors,
+  // so its vertical velocity component is c·√(1−β²) — exactly why the
+  // moving clock ticks slower.
+  (function initLightClocks() {
+    const svgStill = document.getElementById("clock-still");
+    const svgMove  = document.getElementById("clock-moving");
+    const vIn   = document.getElementById("clock-v");
+    const vOut  = document.getElementById("clock-v-readout");
+    const tickS = document.getElementById("ticks-still");
+    const tickM = document.getElementById("ticks-moving");
+    const labelV    = document.getElementById("clock-label-v");
+    const expStill  = document.getElementById("clock-explain-still");
+    const expMoving = document.getElementById("clock-explain-moving");
+    const NUMBER_WORDS = ["zero","one","two","three","four","five","six","seven","eight","nine","ten"];
+    const numWord = n => (n >= 0 && n <= 10) ? NUMBER_WORDS[n] : String(n);
+
+    const W = 380;
+    const yTop = 60, yBot = 180;
+    const Lpx  = yBot - yTop;
+    const halfMirror = 32;
+    const cPx = 220;
+
+    let vFrac = parseFloat(vIn.value);
+    let phY_s = 0, dirY_s = 1, ticks_s = 0;
+    let phY_m = 0, dirY_m = 1, ticks_m = 0;
+    const xMinM = halfMirror + 10;
+    const xMaxM = W - halfMirror - 10;
+    let clockX = xMinM;
+    let trailS = [];
+    let trailM = [];
+    const TRAIL_MAX = 80;
+
+    function mirrorSVG(cx, cy_top, cy_bot) {
+      const halfM = halfMirror;
+      return `<line class="clock-frame" x1="${cx - halfM}" y1="${cy_top}" x2="${cx - halfM}" y2="${cy_bot}"/>` +
+             `<line class="clock-frame" x1="${cx + halfM}" y1="${cy_top}" x2="${cx + halfM}" y2="${cy_bot}"/>` +
+             `<line class="mirror"      x1="${cx - halfM}" y1="${cy_top}" x2="${cx + halfM}" y2="${cy_top}"/>` +
+             `<line class="mirror"      x1="${cx - halfM}" y1="${cy_bot}" x2="${cx + halfM}" y2="${cy_bot}"/>`;
+    }
+    function trailPath(pts) {
+      if (pts.length < 2) return "";
+      return "M" + pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" L");
+    }
+
+    function render() {
+      const cxS = W / 2;
+      svgStill.innerHTML =
+        `<text class="clock-cap" x="${W/2}" y="22" text-anchor="middle">photon goes straight up &amp; down</text>` +
+        mirrorSVG(cxS, yTop, yBot) +
+        `<path class="photon-trail" d="${trailPath(trailS)}"/>` +
+        `<circle class="photon" cx="${cxS.toFixed(1)}" cy="${(yTop + phY_s).toFixed(1)}" r="4.5"/>`;
+
+      svgMove.innerHTML =
+        `<text class="clock-cap" x="${W/2}" y="22" text-anchor="middle">photon traces a longer diagonal</text>` +
+        mirrorSVG(clockX, yTop, yBot) +
+        `<path class="photon-trail" d="${trailPath(trailM)}"/>` +
+        `<circle class="photon" cx="${clockX.toFixed(1)}" cy="${(yTop + phY_m).toFixed(1)}" r="4.5"/>`;
+
+      tickS.textContent = ticks_s;
+      tickM.textContent = ticks_m;
+    }
+
+    let last = 0;
+    function step(now) {
+      if (!last) last = now;
+      let dt = (now - last) / 1000;
+      last = now;
+      if (dt > 0.05) dt = 0.05;
+
+      phY_s += dirY_s * cPx * dt;
+      if (phY_s >= Lpx) { phY_s = 2*Lpx - phY_s; dirY_s = -1; ticks_s++; }
+      if (phY_s <= 0)   { phY_s = -phY_s;        dirY_s =  1; ticks_s++; }
+      trailS.push({ x: W/2, y: yTop + phY_s });
+      if (trailS.length > TRAIL_MAX) trailS.shift();
+
+      const vy = cPx * Math.sqrt(1 - vFrac * vFrac);
+      const vx = cPx * vFrac;
+      phY_m += dirY_m * vy * dt;
+      if (phY_m >= Lpx) { phY_m = 2*Lpx - phY_m; dirY_m = -1; ticks_m++; }
+      if (phY_m <= 0)   { phY_m = -phY_m;        dirY_m =  1; ticks_m++; }
+      clockX += vx * dt;
+      if (clockX > xMaxM) { clockX = xMinM; trailM = []; }
+      trailM.push({ x: clockX, y: yTop + phY_m });
+      if (trailM.length > TRAIL_MAX) trailM.shift();
+
+      render();
+      requestAnimationFrame(step);
+    }
+
+    function updateExplain() {
+      const g = 1 / Math.sqrt(1 - vFrac * vFrac);
+      vOut.textContent = vFrac.toFixed(2) + " c";
+      if (labelV) labelV.textContent = vFrac.toFixed(2);
+      // Match the "five vs four" cadence from the design: anchor the
+      // stationary clock at five ticks, scale the moving one by 1/γ.
+      const STILL_TICKS = 5;
+      const movingTicks = Math.max(0, Math.round(STILL_TICKS / g));
+      if (expStill)  expStill.textContent  = numWord(STILL_TICKS);
+      if (expMoving) expMoving.textContent = numWord(movingTicks);
+    }
+
+    vIn.addEventListener("input", () => {
+      vFrac = parseFloat(vIn.value);
+      updateExplain();
+      ticks_s = 0; ticks_m = 0;
+      trailS = []; trailM = [];
+      phY_s = 0; dirY_s = 1;
+      phY_m = 0; dirY_m = 1;
+      clockX = xMinM;
+    });
+
+    updateExplain();
+    requestAnimationFrame(step);
+  })();
+</script>
+
+</body>
+</html>
